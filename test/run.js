@@ -12,6 +12,7 @@ const crypto = require('crypto');
 const cp = require('child_process');
 
 const BIN = path.resolve(__dirname, '..', 'bin', 'seal.js');
+const MCP = path.resolve(__dirname, '..', 'bin', 'seal-mcp.js');
 const ROOT = fs.mkdtempSync(path.join(os.tmpdir(), 'seal-test-'));
 const HOME = path.join(ROOT, '_sealhome');   // 密钥/信任列表都关在这里，绝不碰真实 ~/.seal
 fs.mkdirSync(HOME, { recursive: true });
@@ -31,8 +32,26 @@ function sealAt(cwd, args = [], home) {
   });
 }
 
-/** 与 bin/seal.js 里的 stable() 同款：键排序、无空格——测试要用它重算链哈希 */
-function stable(v) {
+/** 按行喂 JSON-RPC 给 MCP server，收 stdout 的每一行；任何一行不是合法 JSON 都记进 parseErr */
+function mcp(cwd, msgs, home = HOME) {
+  const input = msgs.map((m) => JSON.stringify(m)).join('\n') + '\n';
+  const r = cp.spawnSync(process.execPath, [MCP], {
+    cwd, input, encoding: 'utf8', timeout: 90000,
+    env: { ...process.env, SEAL_HOME: home },
+  });
+  let lines = [];
+  let parseErr = null;
+  try {
+    lines = r.stdout.split(/\r?\n/).filter((s) => s.trim()).map((s) => JSON.parse(s));
+  } catch (e) {
+    parseErr = e.message;
+  }
+  return { status: r.status, stdout: r.stdout, stderr: r.stderr, lines, parseErr };
+}
+
+const byId = (r, id) => r.lines.find((m) => m.id === id) || {};
+
+/** 与 bin/seal.js 里的 stable() 同款：键排序、无空格——测试要用它重算链哈希 */function stable(v) {
   if (v === null || typeof v !== 'object') return JSON.stringify(v === undefined ? null : v);
   if (Array.isArray(v)) return '[' + v.map(stable).join(',') + ']';
   return '{' + Object.keys(v).sort().map((k) => JSON.stringify(k) + ':' + stable(v[k])).join(',') + '}';
@@ -95,8 +114,8 @@ const d2 = dir('normal');
       .every((k) => k in rec) && rec.schema === 'seal/1');
   ok('文件条目含 path/bytes/sha256/mtime',
     rec.files.length === 2 && rec.files.every((f) => f.path && f.bytes > 0 && /^[0-9a-f]{64}$/.test(f.sha256) && f.mtime));
-  ok('summary / status / todo 按参数写入',
-    rec.summary === '两个文件的小交付' && rec.status === 'done' && rec.todo === '补一条测试');
+  ok('summary / status / next 按参数写入',
+    rec.summary === '两个文件的小交付' && rec.status === 'done' && rec.next === '补一条测试');
 }
 
 /* ---------- ③ 改一个字节 ---------- */
@@ -149,7 +168,7 @@ console.log('⑤ resume 输出接管简报');
     seal(d2c);
     seal(d2c, ['resume', '--todo', '接着收尾']);
     const r2 = readReceipt(d2c);
-    return r2.todo === '接着收尾' && seal(d2c, ['verify']).status === 0;
+    return r2.next === '接着收尾' && seal(d2c, ['verify']).status === 0;
   })());
 }
 
@@ -555,6 +574,213 @@ console.log('㉒ F3 凭证页显示签名状态');
   ok('没有密钥时也能盖章', noKey.status === 0, noKey.stderr);
   const html2 = fs.readFileSync(path.join(d2, 'seal-out', 'receipt.html'), 'utf8');
   ok('无签名时写「签名：未签名」', /签名：未签名/.test(html2));
+}
+
+/* ---------- ㉓ G1 resume：接管简报是主入口 ---------- */
+console.log('㉓ G1 resume 接管简报');
+{
+  // 找不到凭证：不崩、退出码 3
+  const freshHome = path.join(ROOT, '_home_fresh');
+  const dEmpty = dir('g1-empty');
+  const nf = sealAt(dEmpty, ['resume'], freshHome);
+  ok('没凭证时退出码 3', nf.status === 3, `实际 ${nf.status}`);
+  ok('提示「这个目录里没有凭证，先跑 seal 盖章」',
+    /这个目录里没有凭证，先跑 seal 盖章/.test(nf.stdout), nf.stdout);
+  ok('不抛栈（stderr 里没有 at 文件:行:列）', !/\n\s+at\s+\S+:\d+:\d+/.test(nf.stderr), nf.stderr);
+
+  // 七段齐全
+  const d = dir('g1-full');
+  put(d, 'src/a.js', 'export const a = 1;\n');
+  put(d, 'quote.md', '# 报价单\n');
+  seal(d, ['--summary', '交付了报价单和一个小模块', '--todo', '把备注补全']);
+  const r = seal(d, ['resume']);
+  const out = r.stdout;
+  ok('退出码 0', r.status === 0, r.stderr);
+  ok('① 抬头：编号 + 时间 + 三档状态',
+    /接管简报 · SEAL-\d{8}-\d{6} · \d{4}-\d{2}-\d{2}T[\d:]+\S* · (可验收|部分验证|被改过)/.test(out), out.split('\n')[0]);
+  ok('② 这是什么活：summary 原文', /这是什么活\n\s+交付了报价单和一个小模块/.test(out), out);
+  ok('③ 改了哪些文件：路径 + (字节) + 哈希前 8 位',
+    /src\/a\.js \([1-9]\d* B\) [0-9a-f]{8}\b/.test(out), out);
+  ok('④ 验过什么：条数 + 通过 + 失败', /验过什么：0 条命令，0 条通过，0 条失败/.test(out), out);
+  ok('⑤ 下一步：写 next 字段', /下一步：把备注补全/.test(out), out);
+  ok('⑥ 接手提示：可验收那一条', /接手提示：先跑 node bin\\seal\.js verify 确认现状一致，再决定要不要接着改/.test(out), out);
+  ok('⑦ 末尾提示可加 --json', /机器可读：加 --json 输出/.test(out), out);
+  ok('状态是可验收（链 + 文件都对得上）', /· 可验收$/.test(out.split('\n')[0]), out.split('\n')[0]);
+
+  // --json
+  const j = seal(d, ['resume', '--json']);
+  let data = null;
+  try { data = JSON.parse(j.stdout); } catch { data = null; }
+  ok('--json 输出是合法 JSON', !!data, j.stdout.slice(0, 200));
+  const keys = ['id', 'createdAt', 'status', 'summary', 'files', 'commands', 'next', 'verify'];
+  ok('--json 字段固定且齐全', !!data && keys.every((k) => k in data) && Object.keys(data).length === keys.length,
+    data && Object.keys(data).join(','));
+  ok('--json 的 next 与简报一致', !!data && data.next === '把备注补全', data && String(data.next));
+  ok('--json 的 verify 是三档之一', !!data && ['ok', 'partial', 'tampered'].includes(data.verify.state), data && JSON.stringify(data.verify));
+
+  // 文件多时最多列 8 行
+  const d8 = dir('g1-many');
+  for (let i = 0; i < 11; i++) put(d8, `f${i}.txt`, `x${i}\n`);
+  seal(d8);
+  const r8 = seal(d8, ['resume']).stdout;
+  const listed = r8.split('\n').filter((l) => /^\s+\S.*\(\d+ B\) ?[0-9a-f]{8}$/.test(l));
+  ok('文件清单最多 8 行', listed.length === 8, `实际 ${listed.length} 行`);
+  ok('超出写「还有 3 个」', /还有 3 个/.test(r8), r8);
+
+  // 部分验证：有 recheck 命令没重跑
+  const dp = dir('g1-partial');
+  put(dp, 'a.txt', 'a\n');
+  put(dp, 'seal-out/commands.jsonl', JSON.stringify({ cmd: 'node -v', exit: 0, ms: 5, out: 'v22\n', recheck: true }) + '\n');
+  seal(dp);
+  const rp = seal(dp, ['resume']);
+  ok('有 recheck 命令未跑 → 抬头写「部分验证」', /· 部分验证$/.test(rp.stdout.split('\n')[0]), rp.stdout.split('\n')[0]);
+  ok('接手提示给出条数与 --allow-run',
+    /接手提示：有 1 条命令没重跑，先 verify --allow-run 再接手/.test(rp.stdout), rp.stdout);
+
+  // 被改过：文件变了
+  const dt = dir('g1-tamper');
+  put(dt, 'a.txt', 'a\n');
+  seal(dt);
+  put(dt, 'a.txt', 'a changed\n');
+  const rt = seal(dt, ['resume']).stdout;
+  ok('文件被改 → 抬头写「被改过」', /· 被改过$/.test(rt.split('\n')[0]), rt.split('\n')[0]);
+  ok('列出对不上的文件', /与凭证对不上：a\.txt/.test(rt), rt);
+  ok('接手提示说「先看差异」', /凭证和现状不一致，先看差异再决定是否信任上一棒/.test(rt), rt);
+
+  // 被改过：凭证正文变了
+  const dt2 = dir('g1-tamper-receipt');
+  put(dt2, 'a.txt', 'a\n');
+  seal(dt2);
+  const rp2 = path.join(dt2, 'seal-out', 'receipt.json');
+  const obj = JSON.parse(fs.readFileSync(rp2, 'utf8'));
+  obj.summary = '全部通过，可以验收';
+  fs.writeFileSync(rp2, JSON.stringify(obj, null, 2) + '\n');
+  const rt2 = seal(dt2, ['resume']).stdout;
+  ok('凭证正文被改 → 说「链哈希对不上」', /凭证正文被改过（链哈希对不上）/.test(rt2), rt2);
+  ok('凭证正文被改 → 不写「可验收」', /· 被改过$/.test(rt2.split('\n')[0]), rt2.split('\n')[0]);
+
+  // 三条找凭证的路
+  const deep = dir('g1-full/src/deep');
+  ok('子目录里自动向上找到凭证', /接管简报 · SEAL-/.test(seal(deep, ['resume']).stdout));
+  const other = dir('g1-elsewhere');
+  ok('别的目录靠 ~/.seal/last-receipt 接上', /接管简报 · SEAL-/.test(seal(other, ['resume']).stdout));
+  const ex = seal(other, ['resume', '--receipt', path.join(d, 'seal-out', 'receipt.json')]);
+  ok('--receipt 指定路径可用', ex.status === 0 && /接管简报 · SEAL-/.test(ex.stdout), ex.stdout);
+
+  // --todo 写回：链哈希要重算，签过名的还要重签（否则自己把凭证弄成「被改过」）
+  const dsg = dir('g1-resign');
+  put(dsg, 'a.txt', 'a\n');
+  seal(dsg);
+  const rec1 = readReceipt(dsg);
+  seal(dsg, ['resume', '--todo', '接着收尾']);
+  const rec2 = readReceipt(dsg);
+  ok('resume --todo 写进 next（不再写 todo）', rec2.next === '接着收尾' && rec2.todo === undefined,
+    JSON.stringify({ next: rec2.next, todo: rec2.todo }));
+  ok('改写后重签（签名值变了）', !!rec2.sig && rec2.sig.value !== (rec1.sig || {}).value);
+  const vsg = seal(dsg, ['verify']);
+  ok('改写后仍能验真通过', vsg.status === 0 && /验真成功/.test(vsg.stdout), vsg.stdout);
+}
+
+/* ---------- ㉔ G2 MCP server：每行一个 JSON-RPC ---------- */
+console.log('㉔ G2 seal-mcp.js（stdio / 新行分隔 JSON-RPC）');
+{
+  const d = dir('g2-mcp');
+  put(d, 'a.txt', 'a\n');
+
+  const r = mcp(d, [
+    { jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: '2024-11-05', capabilities: {}, clientInfo: { name: 't', version: '1' } } },
+    { jsonrpc: '2.0', method: 'notifications/initialized' },
+    { jsonrpc: '2.0', id: 2, method: 'tools/list' },
+    { jsonrpc: '2.0', id: 3, method: 'ping' },
+  ]);
+  ok('stdout 每一行都是合法 JSON（没有日志混进来）', r.parseErr === null, r.parseErr || r.stdout.slice(0, 300));
+  ok('通知不回包（4 条消息 → 3 个响应）', r.lines.length === 3, `实际 ${r.lines.length}`);
+
+  const i1 = byId(r, 1).result || {};
+  ok('initialize 返回 protocolVersion = 2024-11-05', i1.protocolVersion === '2024-11-05', JSON.stringify(i1));
+  ok('capabilities.tools 是对象', !!i1.capabilities && typeof i1.capabilities.tools === 'object', JSON.stringify(i1.capabilities));
+  ok('serverInfo = { name: "seal", version }',
+    i1.serverInfo && i1.serverInfo.name === 'seal' && typeof i1.serverInfo.version === 'string', JSON.stringify(i1.serverInfo));
+
+  const tools = ((byId(r, 2).result || {}).tools) || [];
+  ok('tools/list 给出四个工具',
+    tools.length === 4 && ['seal_stamp', 'seal_verify', 'seal_resume', 'seal_show'].every((n) => tools.some((t) => t.name === n)),
+    tools.map((t) => t.name).join(','));
+  ok('四个工具都有真 inputSchema（type object + properties 非空）',
+    tools.every((t) => t.inputSchema && t.inputSchema.type === 'object' && t.inputSchema.properties && Object.keys(t.inputSchema.properties).length > 0),
+    JSON.stringify(tools.map((t) => [t.name, Object.keys((t.inputSchema || {}).properties || {})])));
+  ok('seal_stamp 的 inputSchema 里有 summary / cwd / window',
+    (() => {
+      const t = tools.find((x) => x.name === 'seal_stamp') || {};
+      const p = Object.keys((t.inputSchema || {}).properties || {});
+      return ['summary', 'cwd', 'window'].every((k) => p.includes(k));
+    })());
+  ok('ping 返回空对象', JSON.stringify(byId(r, 3).result) === '{}', JSON.stringify(byId(r, 3).result));
+
+  // 四个工具真的干活
+  const d2 = dir('g2-tools');
+  put(d2, 'b.txt', 'b\n');
+  // 这条 recheck 命令会写文件：MCP 的 verify 绝不能执行它
+  put(d2, 'seal-out/commands.jsonl',
+    JSON.stringify({ cmd: `node -e "require('fs').writeFileSync('PWN_MCP.txt','x')"`, exit: 0, ms: 3, out: '', recheck: true }) + '\n');
+  const rr = mcp(d2, [
+    { jsonrpc: '2.0', id: 10, method: 'tools/call', params: { name: 'seal_stamp', arguments: { summary: 'MCP 盖的章' } } },
+    { jsonrpc: '2.0', id: 11, method: 'tools/call', params: { name: 'seal_verify', arguments: {} } },
+    { jsonrpc: '2.0', id: 12, method: 'tools/call', params: { name: 'seal_resume', arguments: {} } },
+    { jsonrpc: '2.0', id: 13, method: 'tools/call', params: { name: 'seal_show', arguments: {} } },
+    { jsonrpc: '2.0', id: 14, method: 'tools/call', params: { name: 'seal_verify', arguments: { cwd: 'no/such/dir' } } },
+  ]);
+  const st = (byId(rr, 10).result || {}).structuredContent || {};
+  ok('seal_stamp 返回 id / status / files / commands / receiptPath',
+    typeof st.id === 'string' && st.status === 'done' && st.files === 1 && st.commands === 1 && /receipt\.json$/.test(String(st.receiptPath)),
+    JSON.stringify(st));
+  ok('seal_stamp 真把凭证写进 cwd', fs.existsSync(path.join(d2, 'seal-out', 'receipt.json')));
+
+  const vr = (byId(rr, 11).result || {}).structuredContent || {};
+  ok('seal_verify 返回 ok / checked / failed / message',
+    vr.ok === true && typeof vr.checked === 'number' && vr.failed === 0 && /通过/.test(String(vr.message)), JSON.stringify(vr));
+  ok('seal_verify 不执行凭证里的命令（没生成 PWN_MCP.txt）', !fs.existsSync(path.join(d2, 'PWN_MCP.txt')));
+  ok('seal_verify 对未重跑的命令标 partial', vr.partial === true, JSON.stringify(vr));
+
+  const rs = byId(rr, 12).result || {};
+  ok('seal_resume 返回简报文本', /接管简报 · SEAL-/.test(((rs.content || [])[0] || {}).text || ''), JSON.stringify(rs).slice(0, 200));
+  ok('seal_resume 同时返回结构化字段',
+    !!rs.structuredContent && !!rs.structuredContent.id && !!rs.structuredContent.verify, JSON.stringify(rs.structuredContent).slice(0, 200));
+
+  const sh = (byId(rr, 13).result || {}).structuredContent || {};
+  ok('seal_show 返回摘要（含 id / 链哈希）', !!sh.id && !!sh.chainHash, JSON.stringify(sh).slice(0, 200));
+  ok('seal_show 不含 HTML 正文', !/<html|<body/i.test(JSON.stringify(sh)));
+  ok('cwd 不存在时返回 isError，而不是崩', (byId(rr, 14).result || {}).isError === true, JSON.stringify(byId(rr, 14)));
+
+  const dEmpty = dir('g2-empty');
+  const ee = mcp(dEmpty, [{ jsonrpc: '2.0', id: 40, method: 'tools/call', params: { name: 'seal_stamp', arguments: {} } }]);
+  ok('空目录盖章 → isError（不发空凭证）', (byId(ee, 40).result || {}).isError === true, JSON.stringify(byId(ee, 40)));
+
+  // 协议错误码
+  const e = mcp(d, [
+    { jsonrpc: '2.0', id: 20, method: 'nope/method' },
+    { jsonrpc: '2.0', id: 21, method: 'tools/call', params: {} },
+    { jsonrpc: '2.0', id: 22, method: 'tools/call', params: { name: 'nope_tool', arguments: {} } },
+    { jsonrpc: '2.0', id: 23, method: 'tools/call', params: { name: 'seal_stamp', arguments: { window: 'abc' } } },
+    { jsonrpc: '2.0', id: 24, method: 'tools/call', params: { name: 'seal_stamp', arguments: { bogus: 1 } } },
+  ]);
+  ok('未知方法 → -32601', ((byId(e, 20).error) || {}).code === -32601, JSON.stringify(byId(e, 20)));
+  ok('tools/call 缺 name → -32602', ((byId(e, 21).error) || {}).code === -32602, JSON.stringify(byId(e, 21)));
+  ok('未知工具 → -32602', ((byId(e, 22).error) || {}).code === -32602, JSON.stringify(byId(e, 22)));
+  ok('参数类型错 → -32602', ((byId(e, 23).error) || {}).code === -32602, JSON.stringify(byId(e, 23)));
+  ok('不认识的参数 → -32602', ((byId(e, 24).error) || {}).code === -32602, JSON.stringify(byId(e, 24)));
+
+  // 坏行不能带崩整个流
+  const raw = cp.spawnSync(process.execPath, [MCP], {
+    cwd: d, encoding: 'utf8', timeout: 30000,
+    input: '{这不是 JSON\n{"jsonrpc":"2.0","id":30,"method":"ping"}\n',
+    env: { ...process.env, SEAL_HOME: HOME },
+  });
+  let rawLines = [];
+  try { rawLines = raw.stdout.split(/\r?\n/).filter(Boolean).map((l) => JSON.parse(l)); } catch { rawLines = []; }
+  ok('坏行回 -32700，后面的消息照常处理',
+    rawLines.length === 2 && rawLines[0].error && rawLines[0].error.code === -32700 && rawLines[1].id === 30,
+    JSON.stringify(rawLines));
 }
 
 /* ---------- 汇总 ---------- */

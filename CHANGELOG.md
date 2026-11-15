@@ -2,6 +2,28 @@
 
 本文件格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [0.4.0] - 2026-11-15
+
+叙事换主入口：**接手（resume）> 凭证（receipt）> 防篡改（sign）**。凭证是副产物，接管简报才是每天都会用到的那个。
+
+### Added
+
+- `bin/seal-mcp.js`：零依赖 stdio MCP server，每行一个 JSON-RPC 2.0 消息（newline-delimited，不用 `Content-Length`）。实现 `initialize` / `notifications/*`（不回包）/ `ping` / `tools/list` / `tools/call`；未知方法 `-32601`，参数错 `-32602`，坏 JSON 行 `-32700`。四个工具 `seal_stamp` / `seal_verify` / `seal_resume` / `seal_show`，均带真 `inputSchema`（JSON Schema）。日志只进 stderr，stdout 纯协议。
+- `resume --json`：输出裁剪版 `{ id, createdAt, status, summary, files, commands, next, verify }`，字段固定。
+- 凭证新增 `next` 字段（`--todo` 写入；老凭证的 `todo` 仍可读）。`next` 参与链哈希。
+- `~/.seal/last-receipt` 指针：上次盖章记下凭证绝对路径，`resume` / `show` 在没有本地凭证时可回退到它（`verify` 故意不回退——验真不能被全局指针指错对象）。
+
+### Changed
+
+- **`resume` 升级为接管简报**：抬头一行「编号 · 时间 · 状态」（可验收 / 部分验证 / 被改过），七段固定结构，文件清单最多 8 行，末尾一行**按状态给的可执行接手提示**。状态由「链哈希 + 签名 + 逐文件哈希 + 未重跑的 recheck 命令数」当场算出，不是念凭证里自报的 `status`。
+- 找凭证改为三级：`--receipt` → 从 cwd 向上找 `seal-out/receipt.json` → `~/.seal/last-receipt`；都找不到时退出码 3 并提示「先跑 seal 盖章」，不抛栈。
+- `seal.js` 拆出 `sealCore` / `verifyCore` / `resumeCore` / `showCore`：核心不打印、只返回结果，CLI 与 MCP 共用一套逻辑；`main()` 只在 `require.main === module` 时执行。
+- README / landing 首屏改为「一个命令盖章，下一个 AI 一读就接手」，新增「在 MCP 客户端里用」一节（配置片段 + 真实调用与返回）。
+
+### Fixed
+
+- `resume --todo` 改写凭证后**没有重新签名**（有密钥时会把自己签过的凭证改成「签名不匹配」）。现在重算链哈希后重签；本机无密钥则删掉失效的 `sig` 并明确告警。
+
 ## [0.3.0] - 2026-11-15
 
 ### Added
