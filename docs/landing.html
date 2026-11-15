@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>seal · 给 AI 干的活盖章</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  :root{
+    --ink:#1b1b1b; --mut:#6b6b6b; --line:#d8d8d2; --paper:#fff; --bg:#e7e7e3; --accent:#1f4d46;
+  }
+  html{-webkit-text-size-adjust:100%}
+  body{background:var(--bg);color:var(--ink);
+    font:16px/1.75 -apple-system,"Segoe UI","Microsoft YaHei","PingFang SC",sans-serif}
+  .wrap{max-width:940px;margin:0 auto;padding:0 28px}
+  .mono{font-family:ui-monospace,Consolas,"Courier New",monospace}
+  a{color:var(--accent)}
+
+  /* 顶栏 */
+  .top{border-bottom:1.5px solid var(--accent);padding:22px 0 14px;display:flex;justify-content:space-between;align-items:baseline}
+  .brand{font-weight:700;letter-spacing:6px;color:var(--accent);font-size:15px}
+  .top .en{font-size:12px;letter-spacing:1.4px;color:var(--mut)}
+
+  /* Hero */
+  .hero{padding:76px 0 40px}
+  .kicker{font-size:12px;letter-spacing:2px;color:var(--mut);text-transform:uppercase}
+  h1{font-size:52px;line-height:1.18;font-weight:700;letter-spacing:-.5px;margin:14px 0 18px}
+  h1 em{font-style:normal;box-shadow:inset 0 -.42em 0 rgba(31,77,70,.16)}
+  .lede{font-size:19px;color:#3a3a3a;max-width:36em}
+  .lede b{font-weight:600;color:var(--ink)}
+
+  .cmd{margin:34px 0 0;background:#141414;border-radius:4px;padding:18px 20px;overflow:auto}
+  .cmd code{display:block;font-family:ui-monospace,Consolas,monospace;font-size:13.5px;line-height:1.85;color:#e8e8e4;white-space:pre}
+  .cmd .p{color:#7f8f8b}
+  .cmd .o{color:#9fd0c4}
+  .cmd .w{color:#d9a05b}
+
+  .meta-row{margin-top:16px;font-size:13px;color:var(--mut);letter-spacing:.3px}
+  .meta-row span+span:before{content:"·";margin:0 10px;color:#b9b9b3}
+
+  /* 卖点 */
+  .points{display:grid;grid-template-columns:repeat(3,1fr);gap:26px;padding:36px 0 8px;border-top:1px solid var(--line);margin-top:52px}
+  .pt .n{font-family:ui-monospace,Consolas,monospace;font-size:12px;letter-spacing:1px;color:var(--accent);font-weight:700}
+  .pt h3{font-size:17px;margin:8px 0 8px;font-weight:700}
+  .pt p{font-size:14.5px;color:#404040;line-height:1.72}
+
+  /* 图 */
+  figure{margin:52px 0 0}
+  figure img{width:100%;display:block;border:1px solid var(--line);border-radius:3px;background:#fff}
+  figcaption{margin-top:10px;font-size:13px;color:var(--mut)}
+
+  /* 对比 */
+  .why{margin-top:64px;padding-top:34px;border-top:1.5px solid var(--ink)}
+  .why h2{font-size:26px;font-weight:700;letter-spacing:-.2px}
+  .why p{margin-top:16px;font-size:16px;color:#2e2e2e}
+  table{width:100%;border-collapse:collapse;margin-top:26px;font-size:14.5px}
+  th,td{padding:11px 0;text-align:left;vertical-align:top;border-bottom:1px solid var(--line)}
+  th{border-top:1.5px solid var(--ink);border-bottom:1px solid var(--ink);font-size:12px;letter-spacing:1.2px;color:var(--mut);font-weight:600}
+  td:first-child{width:30%;font-weight:600}
+  td:last-child{color:#2e2e2e}
+  tr.hl td{background:#f4f6f5}
+  tr.hl td:first-child{color:var(--accent)}
+
+  footer{margin-top:64px;border-top:1px solid var(--line);padding:20px 0 60px;font-size:12.5px;color:var(--mut);display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px}
+  footer .mono{font-size:12px}
+
+  @media (max-width:720px){
+    h1{font-size:36px}
+    .points{grid-template-columns:1fr;gap:22px}
+    .hero{padding:48px 0 20px}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="top">
+    <div class="brand">SEAL</div>
+    <div class="en">交付凭证 / DELIVERY RECEIPT</div>
+  </div>
+
+  <div class="hero">
+    <div class="kicker">for agents and the people who pay for them</div>
+    <h1>给 AI 干的活<em>盖章</em></h1>
+    <p class="lede">一条命令生成可核验的交付凭证：<b>甲方能验</b>，<b>下一个 AI 能接手</b>。零依赖、离线、不上传任何东西。</p>
+
+    <div class="cmd"><code><span class="p">D:\work\my-project&gt;</span> node bin/seal.js
+<span class="o">已盖章：11 个文件 / 7 条命令 / 编号 SEAL-20261115-191040</span>
+  凭证 seal-out\receipt.json · 网页 seal-out\receipt.html
+
+<span class="p">D:\work\my-project&gt;</span> node bin/seal.js verify
+<span class="w">不通过 11/12：docs/spec.md 哈希不一致</span>
+<span class="p">  （凭证 baa0cbce… / 现状 d1512966…）</span></code></div>
+
+    <div class="meta-row"><span>Node 18+</span><span>0 依赖</span><span>MIT</span><span>41/41 自测</span></div>
+  </div>
+
+  <div class="points">
+    <div class="pt">
+      <div class="n">01</div>
+      <h3>结论，不是流水</h3>
+      <p>不是「我今天改了 11 个文件」，而是「折扣列和两位小数修好了，可验收」。一句话加三档状态，甲方不用懂技术。</p>
+    </div>
+    <div class="pt">
+      <div class="n">02</div>
+      <h3>指纹，不是截图</h3>
+      <p>每个文件带 SHA-256，整份凭证再串一个链哈希。改一个字节，<span class="mono">verify</span> 当场报不通过——不用信谁的说法。</p>
+    </div>
+    <div class="pt">
+      <div class="n">03</div>
+      <h3>能接手，不是失忆</h3>
+      <p><span class="mono">resume</span> 把凭证翻成一页简报：改了什么、验过什么、下一步做什么。换个会话接着干，不用从头问。</p>
+    </div>
+  </div>
+
+  <figure>
+    <img src="shots/01-seal.png" alt="终端里执行 seal，输出凭证路径">
+    <figcaption>真的跑一次：<span class="mono">node bin/seal.js</span> 之后，项目里多出 <span class="mono">seal-out/</span> 两个文件。</figcaption>
+  </figure>
+
+  <figure>
+    <img src="shots/04-receipt-browser.png" alt="浏览器里的交付凭证，一页 A4">
+    <figcaption>凭证本身是一页 A4：结论、文件哈希、命令记录、链哈希。可以直接打印，也可以发人。</figcaption>
+  </figure>
+
+  <div class="why">
+    <h2>为什么不是又一个日志工具</h2>
+    <p>日志是写给自己看的，越详细越好；凭证是写给验收方看的，越短越好，但每一个字都要能被反查。这两件事方向相反，所以日志永远替不了凭证。</p>
+    <p>截图能 P，也能只截一半；聊天记录里有结论，但没有指纹，也没有「下一步」。真出事那天，你需要的是有人能在一个命令里重算一遍，而不是翻 200 条消息对时间线。</p>
+
+    <table>
+      <thead><tr><th>你可能已经有的</th><th>它缺的那一块</th></tr></thead>
+      <tbody>
+        <tr><td>提交日志 / 运行日志</td><td>只说做过什么，不构成对外的结论，也没法证明之后没被改</td></tr>
+        <tr><td>截图 / 录屏</td><td>可编辑、可裁切，无法自己验证，验收方只能选择相信</td></tr>
+        <tr><td>聊天记录</td><td>人看得懂，机器读不了；换个会话就断片</td></tr>
+        <tr class="hl"><td>seal 凭证</td><td>结论 + 文件哈希 + 命令指纹 + 链哈希，一条 <span class="mono">verify</span> 就能重算</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <footer>
+    <span>Seal v0.1 · 本地生成，未上传任何内容</span>
+    <span class="mono">node bin/seal.js · verify · resume · show</span>
+  </footer>
+
+</div>
+</body>
+</html>
