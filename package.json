@@ -6,17 +6,24 @@
   "scripts": { "test": "node test/run.js" },
   "keywords": [
     "agent",
-    "ai-agent",
-    "receipt",
-    "provenance",
-    "audit",
+    "ai",
     "delivery",
-    "handoff",
-    "verify",
-    "sha256",
+    "receipt",
+    "verification",
+    "audit",
     "cli"
   ],
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/wangssc/seal"
+  },
+  "files": [
+    "bin",
+    "lib",
+    "README.md",
+    "LICENSE"
+  ],
   "engines": { "node": ">=18" },
   "dependencies": {}
 }
