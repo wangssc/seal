@@ -701,16 +701,14 @@ function resumeCore(opts = {}) {
   const nextText = typeof opts.next === 'string' ? opts.next : typeof opts.todo === 'string' ? opts.todo : null;
   if (nextText !== null) {
     const prev = (r.chain && r.chain.prev) || '';
+    const hadSig = !!r.sig;                 // bodyOf 会把 sig 剔掉，先记下来才知道要不要告警
     const body = bodyOf(r);
     body.next = nextText;
     delete body.todo;                       // 老字段只读不写：一份凭证不留两个「下一步」
     body.chain = { alg: 'sha256', prev, hash: chainHash(prev, bodyOf(body)) };
     const re = signChain(body.chain.hash);
     if (re) body.sig = re;
-    else if (body.sig) {
-      delete body.sig;
-      notes.push('本机没有密钥，改写后原签名失效——这份凭证现在显示为未签名');
-    }
+    else if (hadSig) notes.push('本机没有密钥，改写后原签名失效——这份凭证现在显示为未签名');
     fs.writeFileSync(ctx.file, JSON.stringify(body, null, 2) + '\n', 'utf8');
     fs.writeFileSync(path.join(path.dirname(ctx.file), 'receipt.html'), receiptHTML(body), 'utf8');
     r = body;

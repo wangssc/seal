@@ -679,6 +679,15 @@ console.log('㉓ G1 resume 接管简报');
   ok('改写后重签（签名值变了）', !!rec2.sig && rec2.sig.value !== (rec1.sig || {}).value);
   const vsg = seal(dsg, ['verify']);
   ok('改写后仍能验真通过', vsg.status === 0 && /验真成功/.test(vsg.stdout), vsg.stdout);
+
+  // 换一台没有钥匙的机器改 next：必须告警，不能假装签名还在
+  const dnk = dir('g1-nokey');
+  put(dnk, 'a.txt', 'a\n');
+  seal(dnk);                                   // HOME 里有钥匙 → 带签名
+  const nk = sealAt(dnk, ['resume', '--todo', '别人接着改'], path.join(ROOT, '_home_nokey'));
+  ok('无密钥改写 → 明说「原签名失效」', /原签名失效/.test(nk.stdout), nk.stdout);
+  ok('无密钥改写 → 凭证不再假装有签名', !readReceipt(dnk).sig);
+  ok('无密钥改写 → 链哈希仍自洽（verify 不误报被改过）', seal(dnk, ['verify']).status === 0);
 }
 
 /* ---------- ㉔ G2 MCP server：每行一个 JSON-RPC ---------- */

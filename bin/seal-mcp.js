@@ -265,4 +265,26 @@ process.stdin.on('error', (e) => log('stdin error:', (e && e.message) || String(
 process.on('uncaughtException', (e) => log('uncaught:', (e && e.stack) || String(e)));
 process.on('unhandledRejection', (e) => log('unhandled:', (e && e.message) || String(e)));
 
+// --help / --version 不该把 stdio 服务起起来，也不该污染 stdout 协议
+const _argv = process.argv.slice(2);
+if (_argv.includes('--version') || _argv.includes('-v')) {
+  process.stdout.write(`${SERVER.version}\n`);
+  process.exit(0);
+}
+if (_argv.includes('--help') || _argv.includes('-h')) {
+  process.stdout.write(
+    [
+      'seal-mcp ' + SERVER.version + ' · MCP server (stdio, newline-delimited JSON-RPC 2.0)',
+      '',
+      '用法：node bin/seal-mcp.js            （MCP 客户端以子进程方式启动它）',
+      '      node bin/seal-mcp.js --version  （打印版本）',
+      '',
+      '工具：' + TOOLS.map((t) => t.name).join(', '),
+      '调试信息只写 stderr；stdout 只走协议。',
+      ''
+    ].join('\n')
+  );
+  process.exit(0);
+}
+
 log(`ready · protocol ${PROTOCOL} · v${SERVER.version} · ${TOOLS.length} tools`);
