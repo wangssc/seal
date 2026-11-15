@@ -11,4 +11,3 @@ _check-deps.js
 token.txt
 .npmrc.publish
 *.pem
-seal-out/
