@@ -603,7 +603,7 @@ console.log('㉓ G1 resume 接管简报');
     /src\/a\.js \([1-9]\d* B\) [0-9a-f]{8}\b/.test(out), out);
   ok('④ 验过什么：条数 + 通过 + 失败', /验过什么：0 条命令，0 条通过，0 条失败/.test(out), out);
   ok('⑤ 下一步：写 next 字段', /下一步：把备注补全/.test(out), out);
-  ok('⑥ 接手提示：可验收那一条', /接手提示：先跑 node bin\\seal\.js verify 确认现状一致，再决定要不要接着改/.test(out), out);
+  ok('⑥ 接手提示：可验收那一条', /接手提示：先跑 node bin[\\/]seal\.js verify 确认现状一致，再决定要不要接着改/.test(out), out);
   ok('⑦ 末尾提示可加 --json', /机器可读：加 --json 输出/.test(out), out);
   ok('状态是可验收（链 + 文件都对得上）', /· 可验收$/.test(out.split('\n')[0]), out.split('\n')[0]);
 
