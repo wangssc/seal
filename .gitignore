@@ -8,3 +8,6 @@ demo/project/seal-out/*
 demo/sandbox/
 _task-*.md
 _check-deps.js
+token.txt
+.npmrc.publish
+*.pem
