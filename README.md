@@ -19,12 +19,17 @@
 | 命令 | 干什么 | 你会看到 |
 |---|---|---|
 | `node bin/seal.js` | 盖章：扫当前项目近 30 分钟改过的文件，连同命令记录算成一份凭证 | `seal-out/receipt.json` + `seal-out/receipt.html` |
-| `node bin/seal.js verify` | 验真：重算链哈希、逐个文件哈希，再重跑你声明要重跑的命令 | `通过 12/12 …` 或 `不通过 11/12：…`，退出码 0 / 1 |
+| `node bin/seal.js run -- <命令>` | 跑一条命令并把完整输出记进 `seal-out/commands.jsonl`（`seal -- <命令>` 等价） | 命令自己的输出 + `已记录：…` |
+| `node bin/seal.js verify` | 验真：重算链哈希、逐个文件哈希；凭证里标了 `recheck` 的命令只列出来，**默认不执行** | `通过 12/12 …` 或 `不通过 11/12：…`，退出码 0 / 1 |
+| `node bin/seal.js verify --allow-run` | 连同 `recheck` 命令一起真跑（命令含危险字符会提示） | `$ <命令>` + 退出码与输出指纹比对结果 |
+| `node bin/seal.js keygen` | 生成 ed25519 密钥（`~/.seal/key.json` + 可直接发人的 `pubkey.json`）；已有则不覆盖，`--force` 才覆盖 | 指纹 + 公钥路径 |
+| `node bin/seal.js trust <公钥文件>` | 把甲方/对方的公钥加进 `~/.seal/trusted.json`；`trust --list` 看清单 | `已加入信任列表：<指纹>` |
+| `node bin/seal.js anchor` | 把 `chain.hash` 写成 `seal-out/ANCHOR` 并提交成一条 git commit（只本地，**不 push**） | `已锚定：commit ab12cd3，时间 …，hash …` |
 | `node bin/seal.js resume` | 接管：把凭证翻译成一份人话简报，下一个会话（或下一个人）直接接着干 | 改了哪些文件 / 验过什么 / 下一步 |
 | `node bin/seal.js show` | 用默认浏览器打开 `receipt.html`；打不开就把路径打出来 | 一页 A4 凭证 |
-| `node bin/seal.js help` | 打印用法 | 上面四行 |
+| `node bin/seal.js help` | 打印用法 | 上面几行 |
 
-盖章时可选：`--summary "一句话结论"`、`--status done|partial|blocked`、`--todo "下一步"`、`--prev 上一份凭证的哈希`（串成链）。
+盖章时可选：`--summary "一句话结论"`、`--status done|partial|blocked`、`--todo "下一步"`、`--prev 上一份凭证的哈希`（串成链）、`--window 分钟`（默认 30）。
 
 ## 30 秒上手
 
@@ -35,13 +40,16 @@
 set SEAL=D:\aa\seal\bin\seal.js
 cd /d D:\work\my-project
 
-:: 1. 盖章（扫近 30 分钟改过的文件 + seal-out\commands.jsonl 里的命令记录）
+:: 1. 跑一条命令，把完整输出记进 commands.jsonl（这一步可选）
+node %SEAL% run -- npm test
+
+:: 2. 盖章（扫近 30 分钟改过的文件 + commands.jsonl 里的命令记录）
 node %SEAL%
 
-:: 2. 验真（通过退出码 0，不通过退出码 1）
+:: 3. 验真（通过退出码 0，不通过退出码 1）
 node %SEAL% verify
 
-:: 3. 把凭证那一页打开给甲方看
+:: 4. 把凭证那一页打开给甲方看
 node %SEAL% show
 ```
 
@@ -55,13 +63,42 @@ node %SEAL% show
 2. **跑过什么**——命令、退出码、耗时、输出的哈希，外加输出前 200 字留档。
 3. **结论**——一句话 summary，加 `done` / `partial` / `blocked` 三档状态。
 4. **链哈希**——整份凭证的 SHA-256；传 `--prev` 时和上一份凭证的哈希串起来，改中间任意一份，后面全对不上。
-5. **能重跑验收**——`commands.jsonl` 里标了 `"recheck": true` 的命令，`verify` 会真跑一遍，比对退出码和输出哈希，不是只看记录。
+5. **能重跑验收**——`commands.jsonl` 里标了 `"recheck": true` 的命令（`seal run --recheck -- <命令>` 会自动标），`verify --allow-run` 会真跑一遍，比对退出码和输出哈希，不是只看记录。**默认不执行**：凭证是别人发来的输入，不能一验就跑代码。
 
-凭证同时给两份：`receipt.json`（可验、可进版本库）和 `receipt.html`（A4 一页，可直接打印或发人）。
+凭证同时给两份：`receipt.json`（可验）和 `receipt.html`（A4 一页，可直接打印或发人）。
+
+> 入库建议：`receipt.json` 建议入库；`commands.jsonl` 不建议入库（可能含输出片段）。
 
 ![凭证网页](docs/shots/04-receipt-browser.png)
 
-> 采集范围说清楚：只登记**近 30 分钟内改动过**的文件，跳过 `node_modules`、`.git`、`seal-out`。它记的是「这次交付动了什么」，不是「仓库里有什么」。
+> 采集范围说清楚：只登记**近 30 分钟内改动过**的文件（`--window` 可调），跳过 `node_modules`、`.git`、`seal-out`。它记的是「这次交付动了什么」，不是「仓库里有什么」。窗口外但 24 小时内改过的文件不会被静默丢掉——盖章时会打一行「注意：另有 N 个文件超出 30 分钟窗口未收录」，同时写进凭证的 `warnings`。什么都没采到时直接拒绝出凭证（退出码 2）。
+
+## 让「防篡改」成立：签名 + 时间锚
+
+`chain.hash` 是**无密钥**的 sha256——算法公开，谁都能把整份凭证重写一遍再重算哈希。所以要挡住这一手，必须有一方不是你自己：
+
+```bat
+node %SEAL% keygen                          :: 1. 生成 ed25519 密钥（~/.seal/key.json）
+node %SEAL%                                 :: 2. 盖章，凭证里自动带 sig
+node %SEAL% trust D:\某个\pubkey.json        :: 3. 甲方把公钥加进信任列表（甲方机器上跑）
+node %SEAL% verify                          :: 4. 甲方验，才知道「谁签的、签完有没有被改」
+node %SEAL% anchor                          :: 5.（可选）把 chain.hash 锚进一条 git 提交
+```
+
+**签名口径（固定，别改）**：签名对象是 `chain.hash` 的 UTF-8 字节；算法 `ed25519`；公钥指纹 = `sha256(公钥 DER/SPKI)` 前 16 位。凭证里的字段是 `sig: { alg, pub_fpr, value(base64) }`。
+
+`verify` 会给三档互不混淆的结论：
+
+| 情况 | 输出 |
+|---|---|
+| 没有 `sig` | `未签名：任何人可重算此凭证（当前结论不构成防抵赖）` |
+| 有 `sig`，公钥不在信任列表 | `已签名，但公钥未被信任（用 seal trust <pubkey 文件> 加入）` |
+| 有 `sig`，公钥已信任且验签通过 | `已签名并验证通过（签名者指纹 …）` |
+| 有 `sig` 但验签失败 | `签名不匹配：凭证被改过`（退出码 1） |
+
+`anchor` 只写 `seal-out/ANCHOR`（一行 `<编号> <chain.hash>`）并提交这一条路径，提交信息 `seal anchor <编号> <hash 前 12 位>`。**它不会 push**——推送之后，这个时间点才真正落到别人手里，无法再改。
+
+> 签名能证明的是「这份凭证是你签的、签完之后没被改」，不能证明「你写的内容是真的」。未 `trust` 之前，「有签名」不等于「可信」。
 
 ## 它跟别的不一样在哪
 
@@ -88,7 +125,7 @@ node %SEAL% show
 
 **The problem.** "Is it done?" — right now the only answer is "yes, trust me". A new session has no memory of which files changed or which tests ran. And once the deliverable is sent, nobody can tell if a number was edited afterwards.
 
-**What it does.** `seal` hashes every file changed in the last 30 minutes plus the command log in `seal-out/commands.jsonl`, then writes `receipt.json` and a one-page `receipt.html`. `verify` recomputes the chain hash, re-hashes every file, and re-runs any command marked `"recheck": true`, comparing exit code and output hash. `resume` prints a short handover brief; `show` opens the receipt page.
+**What it does.** `seal` hashes every file changed in the last 30 minutes (`--window` to widen) plus the command log in `seal-out/commands.jsonl`, then writes `receipt.json` and a one-page `receipt.html`. `seal run -- <cmd>` executes a command, streams its output and records it. `verify` recomputes the chain hash and re-hashes every file; commands marked `"recheck": true` are **listed but not executed** — `--allow-run` actually re-runs them and compares exit code and output hash. `resume` prints a short handover brief; `show` opens the receipt page.
 
 **What's inside.** Changed files with path, size and SHA-256; commands with exit code, duration and output fingerprint; a one-line conclusion with `done` / `partial` / `blocked`; a chain hash linking this receipt to the previous one.
 

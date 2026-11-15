@@ -1,6 +1,6 @@
 {
   "name": "seal",
-  "version": "0.1.0",
+  "version": "0.3.0",
   "description": "给 AI 干的活盖章：一条命令生成可核验的交付凭证，甲方能验，下一个 AI 能接手。",
   "bin": { "seal": "bin/seal.js" },
   "scripts": { "test": "node test/run.js" },

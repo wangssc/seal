@@ -1,2 +1,3 @@
 node_modules/
-seal-out/
+seal-out/*
+!seal-out/receipt.json

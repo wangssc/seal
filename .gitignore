@@ -1,6 +1,10 @@
 node_modules/
-seal-out/
-demo/project/seal-out/
+seal-out/*
+!seal-out/receipt.json
+# ANCHOR 由 seal anchor 自己 git add -f 提交，平时不入库
+seal-out/ANCHOR
+demo/project/seal-out/*
+!demo/project/seal-out/receipt.json
 demo/sandbox/
 _task-*.md
 _check-deps.js
