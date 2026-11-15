@@ -1,5 +1,5 @@
 {
-  "name": "seal",
+  "name": "seal-receipt",
   "version": "0.4.0",
   "description": "给 AI 干的活盖章：一个命令生成可验收的交付凭证，下一个 AI 一读就接手。",
   "bin": { "seal": "bin/seal.js", "seal-mcp": "bin/seal-mcp.js" },

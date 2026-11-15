@@ -17,8 +17,31 @@ if (!gh) { console.log('[!] token.txt 第一行是空的'); process.exit(1); }
 
 const run = (cmd, args, opts = {}) => cp.spawnSync(cmd, args, { cwd: root, encoding: 'utf8', ...opts });
 
+// 0. 仓库不存在就先建（公开）
+async function ensureRepo() {
+  const headers = { Authorization: 'Bearer ' + gh, 'User-Agent': 'seal-publish', 'Content-Type': 'application/json' };
+  const head = await fetch('https://api.github.com/repos/wangssc/seal', { headers });
+  if (head.status === 200) { console.log('[0/3] 仓库已存在，继续。'); return; }
+  if (head.status !== 404) { console.log('[0/3] 查询仓库返回 ' + head.status + '，先继续试推送。'); return; }
+  console.log('[0/3] 仓库不存在，创建一个公开仓库…');
+  const res = await fetch('https://api.github.com/user/repos', {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({
+      name: 'seal',
+      private: false,
+      auto_init: false,
+      description: 'One command turns an AI agent\'s work into a verifiable delivery receipt — and a handoff brief the next agent can read.'
+    })
+  });
+  const j = await res.json();
+  console.log('  ' + (j.full_name ? '已创建 ' + j.full_name : '[!] 创建失败：' + (j.message || res.status)));
+}
+
 // 1. 推送
 const basic = Buffer.from('x:' + gh).toString('base64');
+(async () => {
+await ensureRepo();
 console.log('[1/3] 推送代码…');
 let r = run('git', ['remote', 'remove', 'origin'], { stdio: 'ignore' });
 r = run('git', ['remote', 'add', 'origin', 'https://github.com/wangssc/seal.git']);
@@ -57,3 +80,4 @@ fetch('https://api.github.com/repos/wangssc/seal', {
   try { fs.unlinkSync(npmrc); } catch (e) {}
   console.log(p.status === 0 ? '  npm 已发布。' : '  npm 发布失败（不影响 GitHub 仓库）。');
 }).catch((e) => console.log('  [!] 请求失败：' + e.message));
+})().catch((e) => { console.log('[!] 出错：' + (e && e.message)); process.exit(1); });
