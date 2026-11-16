@@ -36,7 +36,7 @@
 | `node bin/seal.js verify --allow-run` | 连同 `recheck` 命令一起真跑（命令含危险字符会提示） | `$ <命令>` + 退出码与输出指纹比对结果 |
 | `node bin/seal-mcp.js` | 以 MCP server 方式跑：让 agent 自己盖章、自己接手，不用你敲命令 | 见下方「在 MCP 客户端里用」 |
 | `node bin/seal.js keygen` | 生成 ed25519 密钥（`~/.seal/key.json` + 可直接发人的 `pubkey.json`）；已有则不覆盖，`--force` 才覆盖 | 指纹 + 公钥路径 |
-| `node bin/seal.js trust <公钥文件>` | 把甲方/对方的公钥加进 `~/.seal/trusted.json`；`trust --list` 看清单 | `已加入信任列表：<指纹>` |
+| `node bin/seal.js trust <公钥文件>` | 把对方/对方的公钥加进 `~/.seal/trusted.json`；`trust --list` 看清单 | `已加入信任列表：<指纹>` |
 | `node bin/seal.js anchor` | 把 `chain.hash` 写成 `seal-out/ANCHOR` 并提交成一条 git commit（只本地，**不 push**） | `已锚定：commit ab12cd3，时间 …，hash …` |
 | `node bin/seal.js show` | 用默认浏览器打开 `receipt.html`；打不开就把路径打出来 | 一页 A4 凭证 |
 | `node bin/seal.js help` | 打印用法 | 上面几行 |
@@ -154,8 +154,8 @@ MCP server 是零依赖的单个文件，用 `node` 直接拉起来就行。配�
 ```bat
 node %SEAL% keygen                          :: 1. 生成 ed25519 密钥（~/.seal/key.json）
 node %SEAL%                                 :: 2. 盖章，凭证里自动带 sig
-node %SEAL% trust D:\某个\pubkey.json        :: 3. 甲方把公钥加进信任列表（甲方机器上跑）
-node %SEAL% verify                          :: 4. 甲方验，才知道「谁签的、签完有没有被改」
+node %SEAL% trust D:\某个\pubkey.json        :: 3. 对方把公钥加进信任列表（对方机器上跑）
+node %SEAL% verify                          :: 4. 对方验，才知道「谁签的、签完有没有被改」
 node %SEAL% anchor                          :: 5.（可选）把 chain.hash 锚进一条 git 提交
 ```
 
@@ -176,7 +176,7 @@ node %SEAL% anchor                          :: 5.（可选）把 chain.hash 锚�
 
 ## 它跟别的不一样在哪
 
-- **日志 ≠ 凭证。** 日志是给自己看的流水，一行一条，谁都能写；凭证是给甲方看的结论加可验指纹，改一个字就验不过。
+- **日志 ≠ 凭证。** 日志是给自己看的流水，一行一条，谁都能写；凭证是给对方看的结论加可验指纹，改一个字就验不过。
 - **截图 ≠ 可验。** 截图能 P、能截一半。`verify` 是当场重算哈希，不是读你写的说明。
 - **聊天记录 ≠ 能接手。** 接手的人不想翻 200 条消息，他想要「改了 11 个文件、7 条命令、下一步是什么」这样一页。
 
