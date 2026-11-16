@@ -251,7 +251,7 @@ function cmdKeygen(opts) {
 
   console.log(`已生成密钥：${f}`);
   console.log(`  指纹 ${pub_fpr}`);
-  console.log(`  公钥 ${pubFile()}　- 把这个文件发给甲方，他跑 seal trust <文件> 就能验你的签名`);
+  console.log(`  公钥 ${pubFile()}　- 把这个文件发给对方，他跑 seal trust <文件> 就能验你的签名`);
   return 0;
 }
 

@@ -1,3 +1,3 @@
 node_modules/
+# 本地生成的凭证含本机路径，不入库
 seal-out/*
-!seal-out/receipt.json

@@ -80,7 +80,7 @@ MCP server 是零依赖的单个文件，用 `node` 直接拉起来就行。配�
   "mcpServers": {
     "seal": {
       "command": "node",
-      "args": ["D:\\aa\\seal\\bin\\seal-mcp.js"]
+      "args": ["<插件目录>\\bin\\seal-mcp.js"]
     }
   }
 }

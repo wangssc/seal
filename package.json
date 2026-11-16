@@ -18,7 +18,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/wangssc/seal"
+    "url": "https://github.com/OWNER/seal"
   },
   "files": [
     "bin",
