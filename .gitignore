@@ -1,9 +1,10 @@
 node_modules/
-# 本地生成的凭证会写入 cwd（含本机路径），不入库；demo 凭证在本地重新生成
+# local receipts embed absolute paths, keep the folder out but allow the artifact file
 seal-out/*
-# ANCHOR 由 seal anchor 自己 git add -f 提交，平时不入库
+!seal-out/receipt.json
 seal-out/ANCHOR
 demo/project/seal-out/*
+!demo/project/seal-out/receipt.json
 demo/sandbox/
 _task-*.md
 _check-deps.js
