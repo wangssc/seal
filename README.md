@@ -2,7 +2,9 @@
 
 **给 AI 干的活盖章。一个命令生成可验收的交付凭证，下一个 AI 一读就接手。**
 
-`License: MIT` · `Node ≥ 18` · `Deps: 0` · `Tests: 174/174`（徽标位先放文字，仓库开通后再换成图）
+`License: MIT` · `Node ≥ 18` · `Deps: 0` · `Tests: 174/174`
+
+[![M8ven Score](https://m8ven.ai/badge/mcp/wangssc/seal)](https://m8ven.ai/mcp/wangssc/seal?s=readme)
 
 ---
 
