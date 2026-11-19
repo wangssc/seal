@@ -42,6 +42,7 @@ const TOOLS = [
       },
       additionalProperties: false,
     },
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
   },
   {
     name: 'seal_verify',
@@ -51,6 +52,7 @@ const TOOLS = [
       properties: { cwd: CWD_SCHEMA },
       additionalProperties: false,
     },
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   },
   {
     name: 'seal_resume',
@@ -60,6 +62,7 @@ const TOOLS = [
       properties: { cwd: CWD_SCHEMA, receipt: RECEIPT_SCHEMA },
       additionalProperties: false,
     },
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   },
   {
     name: 'seal_show',
@@ -69,6 +72,7 @@ const TOOLS = [
       properties: { cwd: CWD_SCHEMA, receipt: RECEIPT_SCHEMA },
       additionalProperties: false,
     },
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   },
 ];
 
